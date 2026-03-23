@@ -1,20 +1,20 @@
 """
 document_loader.py — Extract text from PDF documents.
-
 Uses PyMuPDF (fitz) to read PDF files and return structured text
 with page-level metadata.
 """
-
 import fitz  # PyMuPDF
 from pathlib import Path
 
 
-def load_pdf(file_path: str) -> list[dict]:
+def load_pdf(file_path: str, original_filename: str | None = None) -> list[dict]:
     """
     Extract text from a PDF file, one entry per page.
 
     Args:
         file_path: Path to the PDF file.
+        original_filename: Display name for the source file. If None, uses the
+            actual filename from file_path. Useful when file_path is a temp file.
 
     Returns:
         A list of dicts, each containing:
@@ -26,9 +26,10 @@ def load_pdf(file_path: str) -> list[dict]:
 
     if not path.exists():
         raise FileNotFoundError(f"PDF not found: {file_path}")
-
     if not path.suffix.lower() == ".pdf":
         raise ValueError(f"Expected a PDF file, got: {path.suffix}")
+
+    source_name = original_filename or path.name
 
     doc = fitz.open(file_path)
     pages = []
@@ -42,12 +43,12 @@ def load_pdf(file_path: str) -> list[dict]:
             pages.append({
                 "page_number": page_num + 1,  # 1-indexed for humans
                 "text": text.strip(),
-                "source": path.name,
+                "source": source_name,
             })
 
     doc.close()
+    print(f"Loaded {len(pages)} pages from '{source_name}'")
 
-    print(f"Loaded {len(pages)} pages from '{path.name}'")
     return pages
 
 

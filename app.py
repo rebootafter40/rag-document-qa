@@ -34,7 +34,7 @@ with st.sidebar:
 
                 # Clear old data and ingest new document
                 clear_collection()
-                num_chunks = ingest_pdf(tmp_path)
+                num_chunks = ingest_pdf(tmp_path, original_filename=uploaded_file.name)
 
                 # Clean up temp file
                 os.unlink(tmp_path)
