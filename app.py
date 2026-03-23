@@ -1,7 +1,6 @@
 """
 app.py — Streamlit frontend for the RAG Document Q&A app.
 """
-
 import streamlit as st
 from src.retriever import ingest_pdf, retrieve
 from src.qa_chain import ask
@@ -19,6 +18,7 @@ st.set_page_config(
 st.title("📄 Document Q&A")
 st.markdown("Upload a PDF and ask questions about it. Answers are grounded in your document with source citations.")
 
+
 # --- Sidebar ---
 with st.sidebar:
     st.header("📁 Upload Document")
@@ -27,24 +27,33 @@ with st.sidebar:
     if uploaded_file and "processed_file" not in st.session_state:
         if st.button("Process Document", type="primary"):
             with st.spinner("Processing document... This may take a minute."):
-                # Save uploaded file to a temp location
-                with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp:
-                    tmp.write(uploaded_file.getbuffer())
-                    tmp_path = tmp.name
+                tmp_path = None
+                try:
+                    # Save uploaded file to a temp location
+                    with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp:
+                        tmp.write(uploaded_file.getbuffer())
+                        tmp_path = tmp.name
 
-                # Clear old data and ingest new document
-                clear_collection()
-                num_chunks = ingest_pdf(tmp_path, original_filename=uploaded_file.name)
+                    # Clear old data and ingest new document
+                    clear_collection()
+                    num_chunks = ingest_pdf(tmp_path, original_filename=uploaded_file.name)
 
-                # Clean up temp file
-                os.unlink(tmp_path)
+                    # Save state so we don't reprocess
+                    st.session_state["processed_file"] = uploaded_file.name
+                    st.session_state["num_chunks"] = num_chunks
+                    st.session_state["messages"] = []
+                    st.success(f"Processed '{uploaded_file.name}' into {num_chunks} chunks!")
 
-                # Save state so we don't reprocess
-                st.session_state["processed_file"] = uploaded_file.name
-                st.session_state["num_chunks"] = num_chunks
-                st.session_state["messages"] = []
-
-            st.success(f"Processed '{uploaded_file.name}' into {num_chunks} chunks!")
+                except ValueError as e:
+                    # Validation errors: bad PDF, too large, no text, etc.
+                    st.error(f"⚠️ {e}")
+                except Exception as e:
+                    # Unexpected errors during processing
+                    st.error(f"❌ An unexpected error occurred while processing: {e}")
+                finally:
+                    # Always clean up the temp file, even if processing failed
+                    if tmp_path and os.path.exists(tmp_path):
+                        os.unlink(tmp_path)
 
     if "processed_file" in st.session_state:
         st.success(f"📄 {st.session_state['processed_file']}")
@@ -55,6 +64,7 @@ with st.sidebar:
             for key in ["processed_file", "num_chunks", "messages"]:
                 st.session_state.pop(key, None)
             st.rerun()
+
 
 # --- Main Chat Area ---
 if "processed_file" not in st.session_state:
@@ -88,18 +98,26 @@ else:
         # Generate answer
         with st.chat_message("assistant"):
             with st.spinner("Thinking..."):
-                result = ask(question)
+                try:
+                    result = ask(question)
+                except (ValueError, RuntimeError) as e:
+                    # Show API or validation errors inline in the chat
+                    result = {"answer": f"⚠️ {e}", "sources": []}
+                except Exception as e:
+                    result = {"answer": f"❌ Something went wrong: {e}", "sources": []}
 
             st.markdown(result["answer"])
 
-            with st.expander("📚 View Sources"):
-                for s in result["sources"]:
-                    st.caption(
-                        f"**{s['source']}**, Page {s['page_number']} "
-                        f"(relevance: {1 - s['distance']:.0%})"
-                    )
-                    st.text(s["text"][:300] + "...")
-                    st.divider()
+            # Only show sources expander if there are sources
+            if result["sources"]:
+                with st.expander("📚 View Sources"):
+                    for s in result["sources"]:
+                        st.caption(
+                            f"**{s['source']}**, Page {s['page_number']} "
+                            f"(relevance: {1 - s['distance']:.0%})"
+                        )
+                        st.text(s["text"][:300] + "...")
+                        st.divider()
 
         # Save to history
         st.session_state["messages"].append({

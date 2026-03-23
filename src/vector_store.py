@@ -40,7 +40,14 @@ def add_documents(chunks: list[dict], embeddings: list[list[float]]) -> None:
         chunks: List of chunk dicts from chunker.py (must have 'text', 'source',
                 'page_number', 'chunk_index').
         embeddings: List of embedding vectors matching the chunks.
+
+    Raises:
+        ValueError: If chunks and embeddings counts don't match,
+            or if inputs are empty.
     """
+    if not chunks:
+        raise ValueError("No chunks to add. The document may be empty.")
+
     if len(chunks) != len(embeddings):
         raise ValueError(
             f"Mismatch: {len(chunks)} chunks but {len(embeddings)} embeddings"
@@ -80,12 +87,21 @@ def query(query_embedding: list[float], top_k: int = 5) -> list[dict]:
             - source (str): Source filename
             - page_number (int): Page number
             - distance (float): Cosine distance (lower = more similar)
+        Returns an empty list if the collection has no documents.
     """
     collection = get_collection()
 
+    # Handle empty collection — return early instead of erroring
+    doc_count = collection.count()
+    if doc_count == 0:
+        return []
+
+    # Don't request more results than exist
+    n_results = min(top_k, doc_count)
+
     results = collection.query(
         query_embeddings=[query_embedding],
-        n_results=top_k,
+        n_results=n_results,
     )
 
     # Unpack ChromaDB's nested result format

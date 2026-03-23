@@ -7,6 +7,11 @@ import fitz  # PyMuPDF
 from pathlib import Path
 
 
+# Limits to prevent resource issues with very large documents
+MAX_FILE_SIZE_MB = 50
+MAX_PAGES = 200
+
+
 def load_pdf(file_path: str, original_filename: str | None = None) -> list[dict]:
     """
     Extract text from a PDF file, one entry per page.
@@ -21,19 +26,46 @@ def load_pdf(file_path: str, original_filename: str | None = None) -> list[dict]
             - page_number (int): 1-indexed page number
             - text (str): Extracted text from that page
             - source (str): Filename of the PDF
+
+    Raises:
+        FileNotFoundError: If the file doesn't exist.
+        ValueError: If the file is not a PDF, exceeds size/page limits,
+            is corrupt, or contains no extractable text.
     """
     path = Path(file_path)
+    source_name = original_filename or path.name
 
     if not path.exists():
         raise FileNotFoundError(f"PDF not found: {file_path}")
     if not path.suffix.lower() == ".pdf":
         raise ValueError(f"Expected a PDF file, got: {path.suffix}")
 
-    source_name = original_filename or path.name
+    # Check file size before opening
+    file_size_mb = path.stat().st_size / (1024 * 1024)
+    if file_size_mb > MAX_FILE_SIZE_MB:
+        raise ValueError(
+            f"'{source_name}' is too large ({file_size_mb:.1f} MB). "
+            f"Maximum allowed size is {MAX_FILE_SIZE_MB} MB."
+        )
 
-    doc = fitz.open(file_path)
+    # Attempt to open the PDF (catches corrupt/malformed files)
+    try:
+        doc = fitz.open(file_path)
+    except Exception as e:
+        raise ValueError(
+            f"Could not open '{source_name}'. The file may be corrupt "
+            f"or password-protected. Details: {e}"
+        ) from e
+
+    # Check page count
+    if len(doc) > MAX_PAGES:
+        doc.close()
+        raise ValueError(
+            f"'{source_name}' has {len(doc)} pages. "
+            f"Maximum allowed is {MAX_PAGES} pages."
+        )
+
     pages = []
-
     for page_num in range(len(doc)):
         page = doc[page_num]
         text = page.get_text()
@@ -47,8 +79,16 @@ def load_pdf(file_path: str, original_filename: str | None = None) -> list[dict]
             })
 
     doc.close()
-    print(f"Loaded {len(pages)} pages from '{source_name}'")
 
+    # Catch image-based PDFs with no extractable text
+    if not pages:
+        raise ValueError(
+            f"No readable text found in '{source_name}'. "
+            "The PDF may be image-based (scanned). "
+            "This app requires text-based PDFs."
+        )
+
+    print(f"Loaded {len(pages)} pages from '{source_name}'")
     return pages
 
 

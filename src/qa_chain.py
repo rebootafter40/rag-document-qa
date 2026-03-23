@@ -1,13 +1,18 @@
 """
 qa_chain.py — Generate answers using Claude and retrieved context.
-
 This is the core RAG function: take a question, retrieve relevant
 chunks, and ask Claude to answer based only on that context.
 """
-
 import os
 from dotenv import load_dotenv
-from anthropic import Anthropic
+from anthropic import (
+    Anthropic,
+    AuthenticationError,
+    RateLimitError,
+    APITimeoutError,
+    APIConnectionError,
+    APIStatusError,
+)
 from src.retriever import retrieve
 
 # Load API key from .env file
@@ -59,14 +64,39 @@ def ask(question: str, top_k: int = 5) -> dict:
         A dict containing:
             - answer (str): Claude's response
             - sources (list[dict]): The retrieved chunks used as context
+
+    Raises:
+        ValueError: If the question is empty.
+        RuntimeError: If the API call fails (auth, rate limit, timeout, etc.).
     """
+    # Validate input
+    if not question or not question.strip():
+        raise ValueError("Question cannot be empty.")
+
+    # Check for API key early so the error message is clear
+    if not os.getenv("ANTHROPIC_API_KEY"):
+        raise RuntimeError(
+            "Anthropic API key not found. "
+            "Make sure ANTHROPIC_API_KEY is set in your .env file."
+        )
+
     # Step 1: Retrieve relevant chunks
     results = retrieve(question, top_k=top_k)
 
-    # Step 2: Build the context from retrieved chunks
+    # Step 2: Handle case where no relevant chunks are found
+    if not results:
+        return {
+            "answer": (
+                "No relevant information found in the uploaded documents. "
+                "Try rephrasing your question or uploading a different document."
+            ),
+            "sources": [],
+        }
+
+    # Step 3: Build the context from retrieved chunks
     context = build_context(results)
 
-    # Step 3: Create the prompt with context + question
+    # Step 4: Create the prompt with context + question
     user_message = f"""Context from documents:
 
 {context}
@@ -78,15 +108,35 @@ Question: {question}
 Please answer based only on the context provided above. Cite the source
 and page number for any claims you make."""
 
-    # Step 4: Call Claude
-    response = client.messages.create(
-        model="claude-sonnet-4-20250514",
-        max_tokens=1024,
-        system=SYSTEM_PROMPT,
-        messages=[
-            {"role": "user", "content": user_message}
-        ],
-    )
+    # Step 5: Call Claude with error handling
+    try:
+        response = client.messages.create(
+            model="claude-sonnet-4-20250514",
+            max_tokens=1024,
+            system=SYSTEM_PROMPT,
+            messages=[
+                {"role": "user", "content": user_message}
+            ],
+        )
+    except AuthenticationError:
+        raise RuntimeError(
+            "Invalid API key. Please check your ANTHROPIC_API_KEY in the .env file."
+        )
+    except RateLimitError:
+        raise RuntimeError(
+            "Rate limit exceeded. Please wait a moment and try again."
+        )
+    except APITimeoutError:
+        raise RuntimeError(
+            "The request to Claude timed out. Please try again."
+        )
+    except APIConnectionError:
+        raise RuntimeError(
+            "Could not connect to the Anthropic API. "
+            "Please check your internet connection."
+        )
+    except APIStatusError as e:
+        raise RuntimeError(f"Anthropic API error: {e.message}") from e
 
     answer = response.content[0].text
 
@@ -118,9 +168,7 @@ if __name__ == "__main__":
         print(f"{'='*60}")
 
         result = ask(question)
-
         print(f"\nA: {result['answer']}")
-
         print(f"\nSources used:")
         for s in result["sources"]:
             print(f"  - {s['source']}, Page {s['page_number']} (distance: {s['distance']:.4f})")
