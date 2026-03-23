@@ -28,6 +28,7 @@ organized into proper documentation later.
   it couldn't answer, noted the only France-related mention it found, and
   explained what would be needed. This is a direct result of the system
   prompt design.
+  Good grounding prompts make the system admit gaps rather than hallucinate. When retrieval misses relevant chunks, the model says 'I don't know' instead of guessing — this is a feature, not bug.
 
 ## Issues Encountered
 - ChromaDB doesn't support Python 3.14 yet, had to install Python 3.12
