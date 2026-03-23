@@ -5,9 +5,12 @@ import streamlit as st
 from src.retriever import ingest_pdf, retrieve
 from src.qa_chain import ask
 from src.vector_store import clear_collection
+from src.logging_config import setup_logging
 import tempfile
 import os
 
+# Initialize logging for all src modules
+setup_logging()
 
 st.set_page_config(
     page_title="Document Q&A",

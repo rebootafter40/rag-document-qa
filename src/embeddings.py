@@ -1,10 +1,12 @@
 """
 embeddings.py — Convert text into vector embeddings.
-
 Uses sentence-transformers to generate embeddings locally (free, no API needed).
 """
+import logging
 
 from sentence_transformers import SentenceTransformer
+
+logger = logging.getLogger(__name__)
 
 # Load the model once when this module is imported
 # all-MiniLM-L6-v2 is small, fast, and good quality for semantic search
@@ -20,9 +22,9 @@ def get_model() -> SentenceTransformer:
     """
     global _model
     if _model is None:
-        print("Loading embedding model (first time may download ~80MB)...")
+        logger.info("Loading embedding model (first time may download ~80MB)...")
         _model = SentenceTransformer("all-MiniLM-L6-v2")
-        print("Model loaded.")
+        logger.info("Embedding model loaded.")
     return _model
 
 

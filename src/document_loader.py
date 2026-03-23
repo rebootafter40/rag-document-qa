@@ -3,9 +3,12 @@ document_loader.py — Extract text from PDF documents.
 Uses PyMuPDF (fitz) to read PDF files and return structured text
 with page-level metadata.
 """
+import logging
+
 import fitz  # PyMuPDF
 from pathlib import Path
 
+logger = logging.getLogger(__name__)
 
 # Limits to prevent resource issues with very large documents
 MAX_FILE_SIZE_MB = 50
@@ -88,7 +91,7 @@ def load_pdf(file_path: str, original_filename: str | None = None) -> list[dict]
             "This app requires text-based PDFs."
         )
 
-    print(f"Loaded {len(pages)} pages from '{source_name}'")
+    logger.info("Loaded %d pages from '%s'", len(pages), source_name)
     return pages
 
 

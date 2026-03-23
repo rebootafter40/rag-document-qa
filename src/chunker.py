@@ -1,9 +1,11 @@
 """
 chunker.py — Split extracted text into overlapping chunks.
-
 Chunks carry metadata (source file, page number, chunk index)
 so that answers can cite their sources later.
 """
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 def chunk_text(
@@ -65,13 +67,12 @@ def chunk_text(
                 "page_number": page_number,
                 "chunk_index": chunk_index,
             })
-
             chunk_index += 1
 
             # Move forward by (end - overlap), so chunks overlap
             start = end - chunk_overlap
 
-    print(f"Created {len(chunks)} chunks from {len(pages)} pages")
+    logger.info("Created %d chunks from %d pages", len(chunks), len(pages))
     return chunks
 
 
