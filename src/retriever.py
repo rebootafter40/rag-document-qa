@@ -7,13 +7,14 @@ from src.embeddings import embed_text, embed_texts
 from src.vector_store import add_documents, query, clear_collection
 from src.document_loader import load_pdf
 from src.chunker import chunk_text
+from src.reranker import rerank
 
 
 def ingest_pdf(
     file_path: str,
     original_filename: str | None = None,
-    chunk_size: int = 1000,
-    chunk_overlap: int = 200,
+    chunk_size: int = 1500,
+    chunk_overlap: int = 300,
 ) -> int:
     """
     Process a PDF file and add it to the vector store.
@@ -42,19 +43,32 @@ def ingest_pdf(
     return len(chunks)
 
 
-def retrieve(query_text: str, top_k: int = 5) -> list[dict]:
+def retrieve(
+    query_text: str,
+    top_k: int = 5,
+    use_reranking: bool = False,
+) -> list[dict]:
     """
     Find the most relevant document chunks for a question.
 
     Args:
         query_text: The user's question.
         top_k: Number of chunks to return.
+        use_reranking: If True, retrieve extra candidates and rerank
+            with a cross-encoder for better accuracy.
 
     Returns:
         A list of dicts with 'text', 'source', 'page_number', and 'distance'.
+        If reranking is enabled, each dict also has 'rerank_score'.
     """
     query_vector = embed_text(query_text)
-    results = query(query_vector, top_k=top_k)
+
+    if use_reranking:
+        # Retrieve more candidates, then let the reranker pick the best
+        candidates = query(query_vector, top_k=top_k * 2)
+        results = rerank(query_text, candidates, top_k=top_k)
+    else:
+        results = query(query_vector, top_k=top_k)
 
     return results
 
@@ -66,7 +80,7 @@ if __name__ == "__main__":
     num_chunks = ingest_pdf("data/sample_docs/Americas-AI-Action-Plan.pdf")
     print(f"Stored {num_chunks} chunks\n")
 
-    # Test with a few different questions
+    # Test with a few different questions — compare with and without reranking
     test_questions = [
         "What does the plan say about AI workforce training?",
         "How will the US compete with China on AI?",
@@ -75,9 +89,15 @@ if __name__ == "__main__":
 
     for question in test_questions:
         print(f"Q: {question}")
-        results = retrieve(question, top_k=2)
 
+        print("  Without reranking:")
+        results = retrieve(question, top_k=3, use_reranking=False)
         for r in results:
-            print(f"  → Page {r['page_number']} (distance: {r['distance']:.4f}): {r['text'][:150]}...")
+            print(f"    → Page {r['page_number']} (distance: {r['distance']:.4f}): {r['text'][:100]}...")
+
+        print("  With reranking:")
+        results = retrieve(question, top_k=3, use_reranking=True)
+        for r in results:
+            print(f"    → Page {r['page_number']} (rerank: {r['rerank_score']:.4f}): {r['text'][:100]}...")
 
         print()

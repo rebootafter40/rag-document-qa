@@ -52,13 +52,15 @@ def build_context(results: list[dict]) -> str:
     return "\n---\n".join(context_parts)
 
 
-def ask(question: str, top_k: int = 5) -> dict:
+def ask(question: str, top_k: int = 5, use_reranking: bool = False) -> dict:
     """
     Answer a question using RAG: retrieve context, then ask Claude.
 
     Args:
         question: The user's natural language question.
         top_k: Number of chunks to retrieve for context.
+        use_reranking: If True, use cross-encoder reranking for better
+            retrieval accuracy (slightly slower).
 
     Returns:
         A dict containing:
@@ -81,7 +83,7 @@ def ask(question: str, top_k: int = 5) -> dict:
         )
 
     # Step 1: Retrieve relevant chunks
-    results = retrieve(question, top_k=top_k)
+    results = retrieve(question, top_k=top_k, use_reranking=use_reranking)
 
     # Step 2: Handle case where no relevant chunks are found
     if not results:

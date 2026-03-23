@@ -12,6 +12,7 @@ import os
 # Initialize logging for all src modules
 setup_logging()
 
+
 st.set_page_config(
     page_title="Document Q&A",
     page_icon="📄",
@@ -68,6 +69,16 @@ with st.sidebar:
                 st.session_state.pop(key, None)
             st.rerun()
 
+    # --- Retrieval Settings ---
+    st.divider()
+    st.header("⚙️ Settings")
+    use_reranking = st.toggle(
+        "Enable reranking",
+        value=False,
+        help="Uses a cross-encoder model to improve retrieval accuracy. "
+             "Slightly slower but can give better answers.",
+    )
+
 
 # --- Main Chat Area ---
 if "processed_file" not in st.session_state:
@@ -102,7 +113,7 @@ else:
         with st.chat_message("assistant"):
             with st.spinner("Thinking..."):
                 try:
-                    result = ask(question)
+                    result = ask(question, use_reranking=use_reranking)
                 except (ValueError, RuntimeError) as e:
                     # Show API or validation errors inline in the chat
                     result = {"answer": f"⚠️ {e}", "sources": []}
