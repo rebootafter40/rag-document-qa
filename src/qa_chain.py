@@ -113,7 +113,7 @@ and page number for any claims you make."""
     # Step 5: Call Claude with error handling
     try:
         response = client.messages.create(
-            model="claude-sonnet-4-20250514",
+            model="claude-sonnet-4-5-20250929",
             max_tokens=1024,
             system=SYSTEM_PROMPT,
             messages=[
