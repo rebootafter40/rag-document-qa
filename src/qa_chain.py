@@ -75,6 +75,13 @@ def ask(question: str, top_k: int = 5, use_reranking: bool = False) -> dict:
     if not question or not question.strip():
         raise ValueError("Question cannot be empty.")
 
+    MAX_QUESTION_LENGTH = 1000
+    if len(question) > MAX_QUESTION_LENGTH:
+        raise ValueError(
+            f"Question is too long ({len(question)} characters). "
+            f"Please keep questions under {MAX_QUESTION_LENGTH} characters."
+        )
+
     # Check for API key early so the error message is clear
     if not os.getenv("ANTHROPIC_API_KEY"):
         raise RuntimeError(
