@@ -67,6 +67,36 @@ Added comprehensive error handling across the full pipeline:
   so errors appear as chat messages instead of stack traces, conditional
   sources expander (hidden when no sources)
 
+## Week 7 — Multi-Document Support & Conversation Memory
+
+### Multi-Document Support
+- Changed chunk IDs from `chunk_0` to `{source}_chunk_0` to prevent 
+  collisions across documents
+- Added `delete_document()` to vector_store.py — removes all chunks 
+  for a specific file using ChromaDB's `where` filter on source metadata
+- Updated app.py from single-file tracking (`processed_file`) to a list 
+  of dicts (`processed_files`) with name and chunk count per document
+- Duplicate upload detection prevents processing the same file twice
+- Sidebar shows all uploaded documents with individual remove buttons
+- "Clear All Documents" replaces the old "Clear & Upload New"
+
+### Conversation Memory
+- Added `conversation_history` parameter to `ask()` in qa_chain.py
+- Passes last 3 Q&A exchanges (6 messages) to Claude for follow-up context
+- app.py sends `st.session_state["messages"][:-1]` to avoid duplicate 
+  user messages (current question is already appended before the call)
+- Follow-ups like "which agencies handle those actions?" now work because 
+  Claude has prior context
+
+### Key Learning
+- Conversation memory helps the LLM understand follow-ups, but the 
+  retriever still operates on the raw query. Vague follow-ups like 
+  "tell me more about that" retrieve poorly because they lack semantic 
+  content for vector search. Query rewriting would fix this but is a 
+  stretch goal.
+- RAG retrieval is semantic, not structural — asking for "page 3" doesn't 
+  work because vector search matches on meaning, not page numbers.
+  
 Tested scenarios: corrupt PDF, missing API key, normal happy path — all passed.
 
 ### Structured Logging
