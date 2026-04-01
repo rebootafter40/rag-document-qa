@@ -4,7 +4,7 @@ app.py — Streamlit frontend for the RAG Document Q&A app.
 import streamlit as st
 from src.retriever import ingest_pdf, retrieve
 from src.qa_chain import ask
-from src.vector_store import clear_collection
+from src.vector_store import clear_collection, delete_document
 from src.logging_config import setup_logging
 import tempfile
 import os
@@ -28,45 +28,68 @@ with st.sidebar:
     st.header("📁 Upload Document")
     uploaded_file = st.file_uploader("Choose a PDF file", type=["pdf"])
 
-    if uploaded_file and "processed_file" not in st.session_state:
-        if st.button("Process Document", type="primary"):
+# Initialize document list if it doesn't exist
+    if "processed_files" not in st.session_state:
+        st.session_state["processed_files"] = []
+
+    if uploaded_file:
+        # Check for duplicate
+        already_uploaded = any(
+            f["name"] == uploaded_file.name
+            for f in st.session_state["processed_files"]
+        )
+
+        if already_uploaded:
+            st.warning(f"'{uploaded_file.name}' is already uploaded.")
+        elif st.button("Process Document", type="primary"):
             with st.spinner("Processing document... This may take a minute."):
                 tmp_path = None
                 try:
-                    # Save uploaded file to a temp location
                     with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp:
                         tmp.write(uploaded_file.getbuffer())
                         tmp_path = tmp.name
 
-                    # Clear old data and ingest new document
-                    clear_collection()
                     num_chunks = ingest_pdf(tmp_path, original_filename=uploaded_file.name)
 
-                    # Save state so we don't reprocess
-                    st.session_state["processed_file"] = uploaded_file.name
-                    st.session_state["num_chunks"] = num_chunks
-                    st.session_state["messages"] = []
+                    st.session_state["processed_files"].append({
+                        "name": uploaded_file.name,
+                        "num_chunks": num_chunks,
+                    })
+
+                    if "messages" not in st.session_state:
+                        st.session_state["messages"] = []
+
                     st.success(f"Processed '{uploaded_file.name}' into {num_chunks} chunks!")
 
                 except ValueError as e:
-                    # Validation errors: bad PDF, too large, no text, etc.
                     st.error(f"⚠️ {e}")
                 except Exception as e:
-                    # Unexpected errors during processing
                     st.error(f"❌ An unexpected error occurred while processing: {e}")
                 finally:
-                    # Always clean up the temp file, even if processing failed
                     if tmp_path and os.path.exists(tmp_path):
                         os.unlink(tmp_path)
 
-    if "processed_file" in st.session_state:
-        st.success(f"📄 {st.session_state['processed_file']}")
-        st.caption(f"{st.session_state['num_chunks']} chunks indexed")
+    # Show uploaded documents
+    if st.session_state.get("processed_files"):
+        st.divider()
+        st.subheader("📚 Uploaded Documents")
+        for doc in st.session_state["processed_files"]:
+            col1, col2 = st.columns([3, 1])
+            with col1:
+                st.caption(f"📄 {doc['name']} — {doc['num_chunks']} chunks")
+            with col2:
+                if st.button("✕", key=f"remove_{doc['name']}"):
+                    delete_document(doc["name"])
+                    st.session_state["processed_files"] = [
+                        f for f in st.session_state["processed_files"]
+                        if f["name"] != doc["name"]
+                    ]
+                    st.rerun()
 
-        if st.button("Clear & Upload New"):
+        if st.button("Clear All Documents"):
             clear_collection()
-            for key in ["processed_file", "num_chunks", "messages"]:
-                st.session_state.pop(key, None)
+            st.session_state["processed_files"] = []
+            st.session_state.pop("messages", None)
             st.rerun()
 
     # --- Retrieval Settings ---
@@ -81,7 +104,7 @@ with st.sidebar:
 
 
 # --- Main Chat Area ---
-if "processed_file" not in st.session_state:
+if not st.session_state.get("processed_files"):
     st.info("👈 Upload a PDF in the sidebar to get started.")
 else:
     # Initialize message history
