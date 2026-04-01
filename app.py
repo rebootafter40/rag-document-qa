@@ -20,7 +20,7 @@ st.set_page_config(
 )
 
 st.title("📄 Document Q&A")
-st.markdown("Upload a PDF and ask questions about it. Answers are grounded in your document with source citations.")
+st.markdown("Upload PDFs and ask questions about them. Answers are grounded in your documents with source citations.")
 
 
 # --- Sidebar ---
@@ -126,7 +126,7 @@ else:
                         st.divider()
 
     # Chat input
-    if question := st.chat_input("Ask a question about your document..."):
+    if question := st.chat_input("Ask a question about your documents..."):
         # Show user message
         st.session_state["messages"].append({"role": "user", "content": question})
         with st.chat_message("user"):

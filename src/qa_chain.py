@@ -61,6 +61,8 @@ def ask(question: str, top_k: int = 5, use_reranking: bool = False, conversation
         top_k: Number of chunks to retrieve for context.
         use_reranking: If True, use cross-encoder reranking for better
             retrieval accuracy (slightly slower).
+        conversation_history: Optional list of prior message dicts with
+            'role' and 'content' keys. Used for follow-up questions.
 
     Returns:
         A dict containing:
