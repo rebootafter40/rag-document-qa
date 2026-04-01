@@ -136,7 +136,7 @@ else:
         with st.chat_message("assistant"):
             with st.spinner("Thinking..."):
                 try:
-                    result = ask(question, use_reranking=use_reranking)
+                    result = ask(question, use_reranking=use_reranking, conversation_history=st.session_state.get("messages", [])[:-1])
                 except (ValueError, RuntimeError) as e:
                     # Show API or validation errors inline in the chat
                     result = {"answer": f"⚠️ {e}", "sources": []}

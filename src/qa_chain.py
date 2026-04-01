@@ -52,7 +52,7 @@ def build_context(results: list[dict]) -> str:
     return "\n---\n".join(context_parts)
 
 
-def ask(question: str, top_k: int = 5, use_reranking: bool = False) -> dict:
+def ask(question: str, top_k: int = 5, use_reranking: bool = False, conversation_history: list[dict] | None = None) -> dict:
     """
     Answer a question using RAG: retrieve context, then ask Claude.
 
@@ -116,6 +116,16 @@ Question: {question}
 
 Please answer based only on the context provided above. Cite the source
 and page number for any claims you make."""
+    
+    # Build messages with conversation history for follow-up questions
+    messages = []
+    if conversation_history:
+        # Include recent conversation turns (limit to last 3 exchanges to manage token usage)
+        recent_history = conversation_history[-6:]  # 3 pairs of user/assistant
+        for msg in recent_history:
+            messages.append({"role": msg["role"], "content": msg["content"]})
+
+    messages.append({"role": "user", "content": user_message})
 
     # Step 5: Call Claude with error handling
     try:
@@ -123,9 +133,7 @@ and page number for any claims you make."""
             model="claude-sonnet-4-5-20250929",
             max_tokens=1024,
             system=SYSTEM_PROMPT,
-            messages=[
-                {"role": "user", "content": user_message}
-            ],
+            messages=messages,
         )
     except AuthenticationError:
         raise RuntimeError(
