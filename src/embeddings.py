@@ -6,10 +6,12 @@ import logging
 
 from sentence_transformers import SentenceTransformer
 
+from src.config import settings
+
 logger = logging.getLogger(__name__)
 
 # Load the model once when this module is imported
-# all-MiniLM-L6-v2 is small, fast, and good quality for semantic search
+# Model name is configured in src/config.py (default: all-MiniLM-L6-v2)
 _model = None
 
 
@@ -23,7 +25,7 @@ def get_model() -> SentenceTransformer:
     global _model
     if _model is None:
         logger.info("Loading embedding model (first time may download ~80MB)...")
-        _model = SentenceTransformer("all-MiniLM-L6-v2")
+        _model = SentenceTransformer(settings.embedding_model)
         logger.info("Embedding model loaded.")
     return _model
 
