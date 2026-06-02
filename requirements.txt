@@ -72,6 +72,7 @@ protobuf==6.33.5
 pyarrow==23.0.1
 pybase64==1.4.3
 pydantic==2.12.5
+pydantic-settings==2.14.1
 pydantic_core==2.41.5
 pydeck==0.9.1
 Pygments==2.19.2
