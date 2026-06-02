@@ -3,8 +3,6 @@ qa_chain.py — Generate answers using Claude and retrieved context.
 This is the core RAG function: take a question, retrieve relevant
 chunks, and ask Claude to answer based only on that context.
 """
-import os
-from dotenv import load_dotenv
 from anthropic import (
     Anthropic,
     AuthenticationError,
@@ -13,12 +11,13 @@ from anthropic import (
     APIConnectionError,
     APIStatusError,
 )
+
+from src.config import settings
 from src.retriever import retrieve
 
-# Load API key from .env file
-load_dotenv()
-
-client = Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
+# API key now comes from the central settings object (loaded from .env by
+# pydantic-settings), so no separate load_dotenv()/os.getenv() needed here.
+client = Anthropic(api_key=settings.anthropic_api_key)
 
 SYSTEM_PROMPT = """You are a helpful document Q&A assistant. Your job is to answer
 questions based ONLY on the provided context from the user's documents.
@@ -52,15 +51,21 @@ def build_context(results: list[dict]) -> str:
     return "\n---\n".join(context_parts)
 
 
-def ask(question: str, top_k: int = 5, use_reranking: bool = False, conversation_history: list[dict] | None = None) -> dict:
+def ask(
+    question: str,
+    top_k: int | None = None,
+    use_reranking: bool | None = None,
+    conversation_history: list[dict] | None = None,
+) -> dict:
     """
     Answer a question using RAG: retrieve context, then ask Claude.
 
     Args:
         question: The user's natural language question.
-        top_k: Number of chunks to retrieve for context.
-        use_reranking: If True, use cross-encoder reranking for better
-            retrieval accuracy (slightly slower).
+        top_k: Number of chunks to retrieve for context. Defaults to
+            settings.top_k (resolved in retrieve()).
+        use_reranking: If True, use cross-encoder reranking. Defaults to
+            settings.use_reranking_default (resolved in retrieve()).
         conversation_history: Optional list of prior message dicts with
             'role' and 'content' keys. Used for follow-up questions.
 
@@ -70,28 +75,27 @@ def ask(question: str, top_k: int = 5, use_reranking: bool = False, conversation
             - sources (list[dict]): The retrieved chunks used as context
 
     Raises:
-        ValueError: If the question is empty.
+        ValueError: If the question is empty or too long.
         RuntimeError: If the API call fails (auth, rate limit, timeout, etc.).
     """
     # Validate input
     if not question or not question.strip():
         raise ValueError("Question cannot be empty.")
 
-    MAX_QUESTION_LENGTH = 1000
-    if len(question) > MAX_QUESTION_LENGTH:
+    if len(question) > settings.max_question_length:
         raise ValueError(
             f"Question is too long ({len(question)} characters). "
-            f"Please keep questions under {MAX_QUESTION_LENGTH} characters."
+            f"Please keep questions under {settings.max_question_length} characters."
         )
 
     # Check for API key early so the error message is clear
-    if not os.getenv("ANTHROPIC_API_KEY"):
+    if not settings.anthropic_api_key:
         raise RuntimeError(
             "Anthropic API key not found. "
             "Make sure ANTHROPIC_API_KEY is set in your .env file."
         )
 
-    # Step 1: Retrieve relevant chunks
+    # Step 1: Retrieve relevant chunks (top_k / reranking resolve from config)
     results = retrieve(question, top_k=top_k, use_reranking=use_reranking)
 
     # Step 2: Handle case where no relevant chunks are found
@@ -118,12 +122,13 @@ Question: {question}
 
 Please answer based only on the context provided above. Cite the source
 and page number for any claims you make."""
-    
+
     # Build messages with conversation history for follow-up questions
     messages = []
     if conversation_history:
-        # Include recent conversation turns (limit to last 3 exchanges to manage token usage)
-        recent_history = conversation_history[-6:]  # 3 pairs of user/assistant
+        # Keep the last N exchanges (each exchange = 1 user + 1 assistant msg)
+        # to give Claude follow-up context without bloating token usage.
+        recent_history = conversation_history[-(settings.history_exchanges * 2):]
         for msg in recent_history:
             messages.append({"role": msg["role"], "content": msg["content"]})
 
@@ -132,8 +137,9 @@ and page number for any claims you make."""
     # Step 5: Call Claude with error handling
     try:
         response = client.messages.create(
-            model="claude-sonnet-4-5-20250929",
-            max_tokens=1024,
+            model=settings.claude_model,
+            max_tokens=settings.max_tokens,
+            temperature=settings.temperature,
             system=SYSTEM_PROMPT,
             messages=messages,
         )
