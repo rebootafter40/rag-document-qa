@@ -5,13 +5,15 @@ so that answers can cite their sources later.
 """
 import logging
 
+from src.config import settings
+
 logger = logging.getLogger(__name__)
 
 
 def chunk_text(
     pages: list[dict],
-    chunk_size: int = 1000,
-    chunk_overlap: int = 200,
+    chunk_size: int | None = None,
+    chunk_overlap: int | None = None,
 ) -> list[dict]:
     """
     Split page text into overlapping chunks.
@@ -19,7 +21,9 @@ def chunk_text(
     Args:
         pages: Output from document_loader.load_pdf().
         chunk_size: Target size of each chunk in characters.
+            Defaults to settings.chunk_size when not provided.
         chunk_overlap: Number of characters to overlap between chunks.
+            Defaults to settings.chunk_overlap when not provided.
 
     Returns:
         A list of dicts, each containing:
@@ -28,6 +32,12 @@ def chunk_text(
             - page_number (int): Page the chunk started on
             - chunk_index (int): Global index of this chunk
     """
+    # Fall back to configured defaults when the caller doesn't override them.
+    if chunk_size is None:
+        chunk_size = settings.chunk_size
+    if chunk_overlap is None:
+        chunk_overlap = settings.chunk_overlap
+
     if chunk_overlap >= chunk_size:
         raise ValueError("chunk_overlap must be less than chunk_size")
 
@@ -56,8 +66,8 @@ def chunk_text(
                 # Pick the best break point (prefer newline, then period)
                 break_point = max(last_newline, last_period)
 
-                if break_point > chunk_size * 0.5:
-                    # Only use it if it's past the halfway mark
+                if break_point > chunk_size * settings.chunk_break_threshold:
+                    # Only use it if it's past the configured threshold
                     chunk_text_content = text[start:start + break_point + 1]
                     end = start + break_point + 1
 
