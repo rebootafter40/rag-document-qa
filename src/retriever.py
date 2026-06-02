@@ -3,6 +3,7 @@ retriever.py — Clean interface for document retrieval.
 Combines embedding and vector search into a single
 retrieve() function that the QA chain will use.
 """
+from src.config import settings
 from src.embeddings import embed_text, embed_texts
 from src.vector_store import add_documents, query, clear_collection
 from src.document_loader import load_pdf
@@ -13,8 +14,8 @@ from src.reranker import rerank
 def ingest_pdf(
     file_path: str,
     original_filename: str | None = None,
-    chunk_size: int = 1500,
-    chunk_overlap: int = 300,
+    chunk_size: int | None = None,
+    chunk_overlap: int | None = None,
 ) -> int:
     """
     Process a PDF file and add it to the vector store.
@@ -26,13 +27,16 @@ def ingest_pdf(
         file_path: Path to the PDF file.
         original_filename: Display name for the source file. If None, uses the
             actual filename from file_path. Useful when file_path is a temp file.
-        chunk_size: Target chunk size in characters.
-        chunk_overlap: Overlap between chunks in characters.
+        chunk_size: Target chunk size in characters. Defaults to
+            settings.chunk_size (resolved inside chunk_text).
+        chunk_overlap: Overlap between chunks in characters. Defaults to
+            settings.chunk_overlap (resolved inside chunk_text).
 
     Returns:
         The number of chunks created and stored.
     """
     pages = load_pdf(file_path, original_filename=original_filename)
+    # Pass chunk settings straight through; chunk_text resolves None -> config.
     chunks = chunk_text(pages, chunk_size=chunk_size, chunk_overlap=chunk_overlap)
 
     texts = [c["text"] for c in chunks]
@@ -45,27 +49,33 @@ def ingest_pdf(
 
 def retrieve(
     query_text: str,
-    top_k: int = 5,
-    use_reranking: bool = False,
+    top_k: int | None = None,
+    use_reranking: bool | None = None,
 ) -> list[dict]:
     """
     Find the most relevant document chunks for a question.
 
     Args:
         query_text: The user's question.
-        top_k: Number of chunks to return.
+        top_k: Number of chunks to return. Defaults to settings.top_k.
         use_reranking: If True, retrieve extra candidates and rerank
-            with a cross-encoder for better accuracy.
+            with a cross-encoder for better accuracy. Defaults to
+            settings.use_reranking_default.
 
     Returns:
         A list of dicts with 'text', 'source', 'page_number', and 'distance'.
         If reranking is enabled, each dict also has 'rerank_score'.
     """
+    if top_k is None:
+        top_k = settings.top_k
+    if use_reranking is None:
+        use_reranking = settings.use_reranking_default
+
     query_vector = embed_text(query_text)
 
     if use_reranking:
         # Retrieve more candidates, then let the reranker pick the best
-        candidates = query(query_vector, top_k=top_k * 2)
+        candidates = query(query_vector, top_k=top_k * settings.rerank_candidate_multiplier)
         results = rerank(query_text, candidates, top_k=top_k)
     else:
         results = query(query_vector, top_k=top_k)
