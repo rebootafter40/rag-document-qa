@@ -3,6 +3,7 @@ document_loader.py — Extract text from PDF documents.
 Uses PyMuPDF (fitz) to read PDF files and return structured text
 with page-level metadata.
 """
+
 import logging
 
 import fitz  # PyMuPDF
@@ -75,11 +76,13 @@ def load_pdf(file_path: str, original_filename: str | None = None) -> list[dict]
 
         # Skip pages with little or no text (e.g., cover images)
         if text.strip():
-            pages.append({
-                "page_number": page_num + 1,  # 1-indexed for humans
-                "text": text.strip(),
-                "source": source_name,
-            })
+            pages.append(
+                {
+                    "page_number": page_num + 1,  # 1-indexed for humans
+                    "text": text.strip(),
+                    "source": source_name,
+                }
+            )
 
     doc.close()
 

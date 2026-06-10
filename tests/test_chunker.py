@@ -1,4 +1,5 @@
 """Tests for the text chunking module."""
+
 import pytest
 from src.chunker import chunk_text
 
@@ -68,10 +69,14 @@ class TestChunkText:
         """Raises ValueError if overlap >= chunk_size."""
         pages = make_pages(["Some text."])
 
-        with pytest.raises(ValueError, match="chunk_overlap must be less than chunk_size"):
+        with pytest.raises(
+            ValueError, match="chunk_overlap must be less than chunk_size"
+        ):
             chunk_text(pages, chunk_size=100, chunk_overlap=100)
 
-        with pytest.raises(ValueError, match="chunk_overlap must be less than chunk_size"):
+        with pytest.raises(
+            ValueError, match="chunk_overlap must be less than chunk_size"
+        ):
             chunk_text(pages, chunk_size=100, chunk_overlap=200)
 
     def test_no_empty_chunks(self):

@@ -1,4 +1,5 @@
 """Tests for the QA chain module."""
+
 import pytest
 from src.qa_chain import build_context
 

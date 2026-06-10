@@ -2,6 +2,7 @@
 embeddings.py — Convert text into vector embeddings.
 Uses sentence-transformers to generate embeddings locally (free, no API needed).
 """
+
 import logging
 
 from sentence_transformers import SentenceTransformer
@@ -81,5 +82,9 @@ if __name__ == "__main__":
     def cosine_sim(a, b):
         return dot(a, b) / (norm(a) * norm(b))
 
-    print(f"\nSimilarity: 'AI policy' vs 'AI rules': {cosine_sim(vectors[0], vectors[1]):.4f}")
-    print(f"Similarity: 'AI policy' vs 'cookies':   {cosine_sim(vectors[0], vectors[2]):.4f}")
+    print(
+        f"\nSimilarity: 'AI policy' vs 'AI rules': {cosine_sim(vectors[0], vectors[1]):.4f}"
+    )
+    print(
+        f"Similarity: 'AI policy' vs 'cookies':   {cosine_sim(vectors[0], vectors[2]):.4f}"
+    )

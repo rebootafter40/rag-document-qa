@@ -3,6 +3,7 @@ qa_chain.py — Generate answers using Claude and retrieved context.
 This is the core RAG function: take a question, retrieve relevant
 chunks, and ask Claude to answer based only on that context.
 """
+
 from anthropic import (
     Anthropic,
     AuthenticationError,
@@ -45,8 +46,7 @@ def build_context(results: list[dict]) -> str:
     context_parts = []
     for i, r in enumerate(results, 1):
         context_parts.append(
-            f"[Source {i}: {r['source']}, Page {r['page_number']}]\n"
-            f"{r['text']}\n"
+            f"[Source {i}: {r['source']}, Page {r['page_number']}]\n" f"{r['text']}\n"
         )
     return "\n---\n".join(context_parts)
 
@@ -128,7 +128,7 @@ and page number for any claims you make."""
     if conversation_history:
         # Keep the last N exchanges (each exchange = 1 user + 1 assistant msg)
         # to give Claude follow-up context without bloating token usage.
-        recent_history = conversation_history[-(settings.history_exchanges * 2):]
+        recent_history = conversation_history[-(settings.history_exchanges * 2) :]
         for msg in recent_history:
             messages.append({"role": msg["role"], "content": msg["content"]})
 
@@ -148,13 +148,9 @@ and page number for any claims you make."""
             "Invalid API key. Please check your ANTHROPIC_API_KEY in the .env file."
         )
     except RateLimitError:
-        raise RuntimeError(
-            "Rate limit exceeded. Please wait a moment and try again."
-        )
+        raise RuntimeError("Rate limit exceeded. Please wait a moment and try again.")
     except APITimeoutError:
-        raise RuntimeError(
-            "The request to Claude timed out. Please try again."
-        )
+        raise RuntimeError("The request to Claude timed out. Please try again.")
     except APIConnectionError:
         raise RuntimeError(
             "Could not connect to the Anthropic API. "
@@ -196,4 +192,6 @@ if __name__ == "__main__":
         print(f"\nA: {result['answer']}")
         print(f"\nSources used:")
         for s in result["sources"]:
-            print(f"  - {s['source']}, Page {s['page_number']} (distance: {s['distance']:.4f})")
+            print(
+                f"  - {s['source']}, Page {s['page_number']} (distance: {s['distance']:.4f})"
+            )

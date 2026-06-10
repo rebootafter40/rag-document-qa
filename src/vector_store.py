@@ -4,6 +4,7 @@ vector_store.py — Store and search document embeddings using ChromaDB.
 Provides a simple interface to add document chunks and query
 for the most similar ones.
 """
+
 import logging
 
 import chromadb
@@ -65,8 +66,7 @@ def add_documents(chunks: list[dict], embeddings: list[list[float]]) -> None:
     ids = [f"{c['source']}_chunk_{c['chunk_index']}" for c in chunks]
     documents = [c["text"] for c in chunks]
     metadatas = [
-        {"source": c["source"], "page_number": c["page_number"]}
-        for c in chunks
+        {"source": c["source"], "page_number": c["page_number"]} for c in chunks
     ]
 
     collection.add(
@@ -117,12 +117,14 @@ def query(query_embedding: list[float], top_k: int | None = None) -> list[dict]:
     # Unpack ChromaDB's nested result format
     output = []
     for i in range(len(results["ids"][0])):
-        output.append({
-            "text": results["documents"][0][i],
-            "source": results["metadatas"][0][i]["source"],
-            "page_number": results["metadatas"][0][i]["page_number"],
-            "distance": results["distances"][0][i],
-        })
+        output.append(
+            {
+                "text": results["documents"][0][i],
+                "source": results["metadatas"][0][i]["source"],
+                "page_number": results["metadatas"][0][i]["page_number"],
+                "distance": results["distances"][0][i],
+            }
+        )
 
     return output
 
@@ -181,6 +183,8 @@ if __name__ == "__main__":
     results = query(query_vector, top_k=3)
 
     for i, result in enumerate(results):
-        print(f"--- Result {i+1} (Page {result['page_number']}, Distance: {result['distance']:.4f}) ---")
+        print(
+            f"--- Result {i+1} (Page {result['page_number']}, Distance: {result['distance']:.4f}) ---"
+        )
         print(result["text"][:300])
         print("...\n")

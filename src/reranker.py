@@ -7,6 +7,7 @@ The tradeoff is speed — so we use the bi-encoder for initial retrieval
 (fast, over all chunks) and the cross-encoder to rerank just the top
 candidates (slow but accurate, over a small set).
 """
+
 import logging
 
 from sentence_transformers import CrossEncoder
@@ -71,9 +72,13 @@ def rerank(query: str, results: list[dict], top_k: int = 5) -> list[dict]:
 if __name__ == "__main__":
     # Quick test: rerank some sample results
     sample_results = [
-        {"text": "The plan focuses on building new data centers and energy infrastructure."},
+        {
+            "text": "The plan focuses on building new data centers and energy infrastructure."
+        },
         {"text": "Workers will need retraining as AI changes the job market."},
-        {"text": "America must lead in AI chip manufacturing and semiconductor production."},
+        {
+            "text": "America must lead in AI chip manufacturing and semiconductor production."
+        },
     ]
 
     query_text = "What does the plan say about semiconductor manufacturing?"

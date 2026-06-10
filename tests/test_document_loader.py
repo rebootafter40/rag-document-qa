@@ -1,4 +1,5 @@
 """Tests for the PDF document loader module."""
+
 import pytest
 from pathlib import Path
 from src.document_loader import load_pdf

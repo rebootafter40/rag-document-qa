@@ -22,7 +22,9 @@ st.set_page_config(
 )
 
 st.title("📄 Document Q&A")
-st.markdown("Upload PDFs and ask questions about them. Answers are grounded in your documents with source citations.")
+st.markdown(
+    "Upload PDFs and ask questions about them. Answers are grounded in your documents with source citations."
+)
 
 
 # --- Sidebar ---
@@ -30,15 +32,14 @@ with st.sidebar:
     st.header("📁 Upload Document")
     uploaded_file = st.file_uploader("Choose a PDF file", type=["pdf"])
 
-# Initialize document list if it doesn't exist
+    # Initialize document list if it doesn't exist
     if "processed_files" not in st.session_state:
         st.session_state["processed_files"] = []
 
     if uploaded_file:
         # Check for duplicate
         already_uploaded = any(
-            f["name"] == uploaded_file.name
-            for f in st.session_state["processed_files"]
+            f["name"] == uploaded_file.name for f in st.session_state["processed_files"]
         )
 
         if already_uploaded:
@@ -47,21 +48,29 @@ with st.sidebar:
             with st.spinner("Processing document... This may take a minute."):
                 tmp_path = None
                 try:
-                    with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp:
+                    with tempfile.NamedTemporaryFile(
+                        delete=False, suffix=".pdf"
+                    ) as tmp:
                         tmp.write(uploaded_file.getbuffer())
                         tmp_path = tmp.name
 
-                    num_chunks = ingest_pdf(tmp_path, original_filename=uploaded_file.name)
+                    num_chunks = ingest_pdf(
+                        tmp_path, original_filename=uploaded_file.name
+                    )
 
-                    st.session_state["processed_files"].append({
-                        "name": uploaded_file.name,
-                        "num_chunks": num_chunks,
-                    })
+                    st.session_state["processed_files"].append(
+                        {
+                            "name": uploaded_file.name,
+                            "num_chunks": num_chunks,
+                        }
+                    )
 
                     if "messages" not in st.session_state:
                         st.session_state["messages"] = []
 
-                    st.success(f"Processed '{uploaded_file.name}' into {num_chunks} chunks!")
+                    st.success(
+                        f"Processed '{uploaded_file.name}' into {num_chunks} chunks!"
+                    )
 
                 except ValueError as e:
                     st.error(f"⚠️ {e}")
@@ -83,7 +92,8 @@ with st.sidebar:
                 if st.button("✕", key=f"remove_{doc['name']}"):
                     delete_document(doc["name"])
                     st.session_state["processed_files"] = [
-                        f for f in st.session_state["processed_files"]
+                        f
+                        for f in st.session_state["processed_files"]
                         if f["name"] != doc["name"]
                     ]
                     st.rerun()
@@ -101,7 +111,7 @@ with st.sidebar:
         "Enable reranking",
         value=False,
         help="Uses a cross-encoder model to improve retrieval accuracy. "
-             "Slightly slower but can give better answers.",
+        "Slightly slower but can give better answers.",
     )
 
 
@@ -124,7 +134,7 @@ else:
                             f"**{s['source']}**, Page {s['page_number']} "
                             f"(relevance: {1 - s['distance']:.0%})"
                         )
-                        st.text(s["text"][:settings.source_preview_chars] + "...")
+                        st.text(s["text"][: settings.source_preview_chars] + "...")
                         st.divider()
 
     # Chat input
@@ -138,7 +148,11 @@ else:
         with st.chat_message("assistant"):
             with st.spinner("Thinking..."):
                 try:
-                    result = ask(question, use_reranking=use_reranking, conversation_history=st.session_state.get("messages", [])[:-1])
+                    result = ask(
+                        question,
+                        use_reranking=use_reranking,
+                        conversation_history=st.session_state.get("messages", [])[:-1],
+                    )
                 except (ValueError, RuntimeError) as e:
                     # Show API or validation errors inline in the chat
                     result = {"answer": f"⚠️ {e}", "sources": []}
@@ -155,12 +169,14 @@ else:
                             f"**{s['source']}**, Page {s['page_number']} "
                             f"(relevance: {1 - s['distance']:.0%})"
                         )
-                        st.text(s["text"][:settings.source_preview_chars] + "...")
+                        st.text(s["text"][: settings.source_preview_chars] + "...")
                         st.divider()
 
         # Save to history
-        st.session_state["messages"].append({
-            "role": "assistant",
-            "content": result["answer"],
-            "sources": result["sources"],
-        })
+        st.session_state["messages"].append(
+            {
+                "role": "assistant",
+                "content": result["answer"],
+                "sources": result["sources"],
+            }
+        )

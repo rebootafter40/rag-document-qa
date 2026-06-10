@@ -3,6 +3,7 @@ chunker.py — Split extracted text into overlapping chunks.
 Chunks carry metadata (source file, page number, chunk index)
 so that answers can cite their sources later.
 """
+
 import logging
 
 from src.config import settings
@@ -68,15 +69,17 @@ def chunk_text(
 
                 if break_point > chunk_size * settings.chunk_break_threshold:
                     # Only use it if it's past the configured threshold
-                    chunk_text_content = text[start:start + break_point + 1]
+                    chunk_text_content = text[start : start + break_point + 1]
                     end = start + break_point + 1
 
-            chunks.append({
-                "text": chunk_text_content.strip(),
-                "source": source,
-                "page_number": page_number,
-                "chunk_index": chunk_index,
-            })
+            chunks.append(
+                {
+                    "text": chunk_text_content.strip(),
+                    "source": source,
+                    "page_number": page_number,
+                    "chunk_index": chunk_index,
+                }
+            )
             chunk_index += 1
 
             # Move forward by (end - overlap), so chunks overlap

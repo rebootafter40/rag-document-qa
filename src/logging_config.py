@@ -2,6 +2,7 @@
 logging_config.py — Configure logging for the application.
 Import this module once (in app.py) to set up consistent log formatting.
 """
+
 import logging
 
 

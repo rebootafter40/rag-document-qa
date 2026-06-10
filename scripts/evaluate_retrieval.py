@@ -5,6 +5,7 @@ Tests multiple chunk size settings, with and without reranking,
 against a set of questions with known answer locations.
 Outputs results as a formatted table for documentation.
 """
+
 import sys
 import time
 from pathlib import Path
@@ -89,7 +90,9 @@ CONFIGS = [
 PDF_PATH = "data/sample_docs/Americas-AI-Action-Plan.pdf"
 
 
-def score_results(results: list[dict], expected_pages: list[int], key_terms: list[str]) -> dict:
+def score_results(
+    results: list[dict], expected_pages: list[int], key_terms: list[str]
+) -> dict:
     """
     Score a set of retrieval results against expected answers.
 
@@ -114,7 +117,9 @@ def score_results(results: list[dict], expected_pages: list[int], key_terms: lis
     }
 
 
-def run_evaluation(chunk_size: int, chunk_overlap: int, use_reranking: bool, top_k: int = 5) -> dict:
+def run_evaluation(
+    chunk_size: int, chunk_overlap: int, use_reranking: bool, top_k: int = 5
+) -> dict:
     """
     Run the full evaluation for one configuration.
 
@@ -183,10 +188,12 @@ def main():
             result["time_seconds"] = round(elapsed, 1)
             all_results.append(result)
 
-            print(f"  → {result['num_chunks']} chunks, "
-                  f"page hits: {result['page_hit_rate']:.0%}, "
-                  f"term coverage: {result['avg_term_coverage']:.0%}, "
-                  f"time: {elapsed:.1f}s")
+            print(
+                f"  → {result['num_chunks']} chunks, "
+                f"page hits: {result['page_hit_rate']:.0%}, "
+                f"term coverage: {result['avg_term_coverage']:.0%}, "
+                f"time: {elapsed:.1f}s"
+            )
 
     # Print summary table
     print()
@@ -199,17 +206,21 @@ def main():
     for r in all_results:
         rerank_label = "+rerank" if r["reranking"] else "       "
         config = f"{r['chunk_size']}/{r['chunk_overlap']} {rerank_label}"
-        print(f"{config:<30} {r['num_chunks']:>6} "
-              f"{r['page_hit_rate']:>6.0%} "
-              f"{r['avg_term_coverage']:>6.0%} "
-              f"{r['time_seconds']:>5.1f}s")
+        print(
+            f"{config:<30} {r['num_chunks']:>6} "
+            f"{r['page_hit_rate']:>6.0%} "
+            f"{r['avg_term_coverage']:>6.0%} "
+            f"{r['time_seconds']:>5.1f}s"
+        )
 
     # Find best config
     best = max(all_results, key=lambda r: (r["page_hit_rate"], r["avg_term_coverage"]))
     rerank_str = " with reranking" if best["reranking"] else ""
     print()
-    print(f"Best config: chunk_size={best['chunk_size']}, "
-          f"overlap={best['chunk_overlap']}{rerank_str}")
+    print(
+        f"Best config: chunk_size={best['chunk_size']}, "
+        f"overlap={best['chunk_overlap']}{rerank_str}"
+    )
     print(f"  Page hit rate: {best['page_hit_rate']:.0%}")
     print(f"  Term coverage: {best['avg_term_coverage']:.0%}")
 

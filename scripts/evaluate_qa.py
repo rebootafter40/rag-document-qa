@@ -28,6 +28,7 @@ Usage:
 NOTE: This resets the vector store and ingests only the test document, so the
 run is reproducible. Re-upload any other documents through the app afterward.
 """
+
 import argparse
 import logging
 import sys
@@ -38,9 +39,9 @@ from pathlib import Path
 # Make `src` importable when this file is run directly (python scripts/evaluate_qa.py).
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from src.qa_chain import ask                      # noqa: E402  (import after path tweak)
-from src.retriever import ingest_pdf              # noqa: E402
-from src.vector_store import clear_collection     # noqa: E402
+from src.qa_chain import ask  # noqa: E402  (import after path tweak)
+from src.retriever import ingest_pdf  # noqa: E402
+from src.vector_store import clear_collection  # noqa: E402
 
 # Quiet the noisy third-party loggers so the eval output stays readable.
 for _noisy in ("httpx", "sentence_transformers", "chromadb"):
@@ -59,8 +60,8 @@ class TestCase:
     id: int
     question: str
     expected_pages: list[int]  # PDF-position page numbers; empty list = should refuse
-    keywords: list[str]        # terms a correct answer should contain (matched as substrings)
-    category: str              # "list" | "factual" | "synthesis" | "negative"
+    keywords: list[str]  # terms a correct answer should contain (matched as substrings)
+    category: str  # "list" | "factual" | "synthesis" | "negative"
 
     @property
     def is_refusal(self) -> bool:
@@ -73,30 +74,76 @@ class TestCase:
 # Some keywords are stems (e.g. "regulat") to match word variants like
 # "regulatory"/"regulation" with a simple case-insensitive substring test.
 TEST_SET: list[TestCase] = [
-    TestCase(1, "What are the three pillars of America's AI Action Plan?",
-             [4, 5], ["innovation", "infrastructure"], "list"),
-    TestCase(2, "What does the plan say about open-source and open-weight AI models?",
-             [7, 8], ["open", "models"], "factual"),
-    TestCase(3, "How does the plan propose to train the AI workforce?",
-             [9, 10, 20], ["workforce", "training"], "synthesis"),
-    TestCase(4, "What does the plan say about AI infrastructure and energy?",
-             [17, 18, 19], ["infrastructure", "energy"], "factual"),
-    TestCase(5, "How does the plan address competition with China?",
-             [4, 17, 23], ["race", "dominance"], "synthesis"),
-    TestCase(6, "What does the plan say about AI and national security?",
-             [9, 13, 24], ["security"], "factual"),
-    TestCase(7, "What is Pillar III about?",
-             [23], ["international", "diplomacy"], "factual"),
-    TestCase(8, "What does the plan recommend about regulatory barriers to AI?",
-             [6, 7], ["regulat"], "factual"),
-    TestCase(9, "What role does the federal government play in supporting open models?",
-             [7, 8], ["federal", "open"], "factual"),
-    TestCase(10, "How does the plan support displaced or retrained workers?",
-             [10], ["retrain", "displac"], "factual"),
-    TestCase(11, "What is the capital of France?",
-             [], [], "negative"),
-    TestCase(12, "What's a good recipe for chocolate chip cookies?",
-             [], [], "negative"),
+    TestCase(
+        1,
+        "What are the three pillars of America's AI Action Plan?",
+        [4, 5],
+        ["innovation", "infrastructure"],
+        "list",
+    ),
+    TestCase(
+        2,
+        "What does the plan say about open-source and open-weight AI models?",
+        [7, 8],
+        ["open", "models"],
+        "factual",
+    ),
+    TestCase(
+        3,
+        "How does the plan propose to train the AI workforce?",
+        [9, 10, 20],
+        ["workforce", "training"],
+        "synthesis",
+    ),
+    TestCase(
+        4,
+        "What does the plan say about AI infrastructure and energy?",
+        [17, 18, 19],
+        ["infrastructure", "energy"],
+        "factual",
+    ),
+    TestCase(
+        5,
+        "How does the plan address competition with China?",
+        [4, 17, 23],
+        ["race", "dominance"],
+        "synthesis",
+    ),
+    TestCase(
+        6,
+        "What does the plan say about AI and national security?",
+        [9, 13, 24],
+        ["security"],
+        "factual",
+    ),
+    TestCase(
+        7, "What is Pillar III about?", [23], ["international", "diplomacy"], "factual"
+    ),
+    TestCase(
+        8,
+        "What does the plan recommend about regulatory barriers to AI?",
+        [6, 7],
+        ["regulat"],
+        "factual",
+    ),
+    TestCase(
+        9,
+        "What role does the federal government play in supporting open models?",
+        [7, 8],
+        ["federal", "open"],
+        "factual",
+    ),
+    TestCase(
+        10,
+        "How does the plan support displaced or retrained workers?",
+        [10],
+        ["retrain", "displac"],
+        "factual",
+    ),
+    TestCase(11, "What is the capital of France?", [], [], "negative"),
+    TestCase(
+        12, "What's a good recipe for chocolate chip cookies?", [], [], "negative"
+    ),
 ]
 
 
@@ -167,7 +214,9 @@ def is_refusal(answer: str) -> bool:
 def prompt_correctness() -> bool | None:
     """Ask the human whether the answer was correct. Returns True / False / None (skip)."""
     while True:
-        choice = input("Was this answer correct? [y]es / [n]o / [s]kip: ").strip().lower()
+        choice = (
+            input("Was this answer correct? [y]es / [n]o / [s]kip: ").strip().lower()
+        )
         if choice in ("y", "yes"):
             return True
         if choice in ("n", "no"):
@@ -272,7 +321,9 @@ def write_markdown_report(results: list[dict], path: str) -> None:
             keywords = f"{r['keywords_found']}/{r['keywords_total']}"
             refusal = "—"
         correct = _mark(r.get("correct"))
-        question = r["question"] if len(r["question"]) <= 60 else r["question"][:57] + "..."
+        question = (
+            r["question"] if len(r["question"]) <= 60 else r["question"][:57] + "..."
+        )
         lines.append(
             f"| {r['id']} | {question} | {r['category']} | {cited} | {expected} | "
             f"{citation} | {keywords} | {refusal} | {correct} |"
@@ -297,9 +348,13 @@ def write_markdown_report(results: list[dict], path: str) -> None:
         f"- **Refusal accuracy:** {refusal_hits}/{len(negatives)} ({_pct(refusal_hits, len(negatives))})",
     ]
     if scored:
-        lines.append(f"- **Manual correctness:** {correct_hits}/{len(scored)} ({_pct(correct_hits, len(scored))})")
+        lines.append(
+            f"- **Manual correctness:** {correct_hits}/{len(scored)} ({_pct(correct_hits, len(scored))})"
+        )
     else:
-        lines.append("- **Manual correctness:** _not yet scored — fill in the Correct column above_")
+        lines.append(
+            "- **Manual correctness:** _not yet scored — fill in the Correct column above_"
+        )
 
     Path(path).parent.mkdir(parents=True, exist_ok=True)
     Path(path).write_text("\n".join(lines) + "\n", encoding="utf-8")

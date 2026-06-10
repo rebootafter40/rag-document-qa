@@ -3,6 +3,7 @@ retriever.py — Clean interface for document retrieval.
 Combines embedding and vector search into a single
 retrieve() function that the QA chain will use.
 """
+
 from src.config import settings
 from src.embeddings import embed_text, embed_texts
 from src.vector_store import add_documents, query, clear_collection
@@ -75,7 +76,9 @@ def retrieve(
 
     if use_reranking:
         # Retrieve more candidates, then let the reranker pick the best
-        candidates = query(query_vector, top_k=top_k * settings.rerank_candidate_multiplier)
+        candidates = query(
+            query_vector, top_k=top_k * settings.rerank_candidate_multiplier
+        )
         results = rerank(query_text, candidates, top_k=top_k)
     else:
         results = query(query_vector, top_k=top_k)
@@ -103,11 +106,15 @@ if __name__ == "__main__":
         print("  Without reranking:")
         results = retrieve(question, top_k=3, use_reranking=False)
         for r in results:
-            print(f"    → Page {r['page_number']} (distance: {r['distance']:.4f}): {r['text'][:100]}...")
+            print(
+                f"    → Page {r['page_number']} (distance: {r['distance']:.4f}): {r['text'][:100]}..."
+            )
 
         print("  With reranking:")
         results = retrieve(question, top_k=3, use_reranking=True)
         for r in results:
-            print(f"    → Page {r['page_number']} (rerank: {r['rerank_score']:.4f}): {r['text'][:100]}...")
+            print(
+                f"    → Page {r['page_number']} (rerank: {r['rerank_score']:.4f}): {r['text'][:100]}..."
+            )
 
         print()
