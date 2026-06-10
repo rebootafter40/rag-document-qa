@@ -1,7 +1,9 @@
 """
 app.py — Streamlit frontend for the RAG Document Q&A app.
 """
+
 import streamlit as st
+from src.config import settings
 from src.retriever import ingest_pdf, retrieve
 from src.qa_chain import ask
 from src.vector_store import clear_collection, delete_document
@@ -122,7 +124,7 @@ else:
                             f"**{s['source']}**, Page {s['page_number']} "
                             f"(relevance: {1 - s['distance']:.0%})"
                         )
-                        st.text(s["text"][:300] + "...")
+                        st.text(s["text"][:settings.source_preview_chars] + "...")
                         st.divider()
 
     # Chat input
@@ -153,7 +155,7 @@ else:
                             f"**{s['source']}**, Page {s['page_number']} "
                             f"(relevance: {1 - s['distance']:.0%})"
                         )
-                        st.text(s["text"][:300] + "...")
+                        st.text(s["text"][:settings.source_preview_chars] + "...")
                         st.divider()
 
         # Save to history
