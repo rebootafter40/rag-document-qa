@@ -190,7 +190,7 @@ if __name__ == "__main__":
 
         result = ask(question)
         print(f"\nA: {result['answer']}")
-        print(f"\nSources used:")
+        print("\nSources used:")
         for s in result["sources"]:
             print(
                 f"  - {s['source']}, Page {s['page_number']} (distance: {s['distance']:.4f})"

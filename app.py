@@ -4,7 +4,7 @@ app.py — Streamlit frontend for the RAG Document Q&A app.
 
 import streamlit as st
 from src.config import settings
-from src.retriever import ingest_pdf, retrieve
+from src.retriever import ingest_pdf
 from src.qa_chain import ask
 from src.vector_store import clear_collection, delete_document
 from src.logging_config import setup_logging
