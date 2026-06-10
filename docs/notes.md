@@ -155,6 +155,25 @@ Created 20 pytest tests across 3 files, all passing:
 
 ---
 
+## Week 8 — Configuration & Evaluation
+
+**Configuration:** Centralized every tunable value + the API key into
+`src/config.py` using pydantic-settings. All six src modules read from one
+validated `settings` object; env-overridable for deployment. Set
+temperature=0.0 explicitly (was silently at the API default). Caught a
+chunk_size drift bug (chunker defaulted to 1000 while retriever passed 1500).
+A wholesale rewrite of vector_store.py from a stale copy silently reverted two
+Week 7 changes (source-scoped chunk IDs + delete_document) — both restored;
+lesson logged about targeted edits over rewrites.
+
+**Evaluation:** Built `scripts/evaluate_qa.py` — end-to-end QA eval (distinct
+from retrieval eval) scoring citation accuracy (±1 page tolerance), keyword
+coverage, and refusal, with manual correctness. Results: citation 9/10,
+keywords 17/20, refusals 2/2, correctness 12/12. One documented miss (Q7,
+structural query). Results in docs/eval_results.md.
+
+---
+
 ## Current Project Structure
 
 ```
