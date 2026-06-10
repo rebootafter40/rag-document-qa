@@ -60,8 +60,9 @@ def add_documents(chunks: list[dict], embeddings: list[list[float]]) -> None:
 
     collection = get_collection()
 
-    # ChromaDB needs string IDs for each document
-    ids = [f"chunk_{c['chunk_index']}" for c in chunks]
+    # FIX 1: Scope IDs by source filename so multiple documents don't collide.
+    # (report.pdf_chunk_0 and manual.pdf_chunk_0 are now distinct.)
+    ids = [f"{c['source']}_chunk_{c['chunk_index']}" for c in chunks]
     documents = [c["text"] for c in chunks]
     metadatas = [
         {"source": c["source"], "page_number": c["page_number"]}
@@ -138,6 +139,20 @@ def clear_collection(collection_name: str | None = None) -> None:
         logger.info("Cleared collection '%s'", collection_name)
     except Exception:
         logger.info("Collection '%s' does not exist", collection_name)
+
+
+# FIX 2: Restored from Week 7 — removes all chunks for one document.
+# Used by the ✕ remove button in app.py.
+def delete_document(source_name: str) -> None:
+    """Remove all chunks belonging to a specific document."""
+    collection = get_collection()
+    results = collection.get(where={"source": source_name})
+
+    if results["ids"]:
+        collection.delete(ids=results["ids"])
+        logger.info("Deleted %d chunks for '%s'", len(results["ids"]), source_name)
+    else:
+        logger.info("No chunks found for '%s'", source_name)
 
 
 if __name__ == "__main__":
