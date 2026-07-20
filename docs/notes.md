@@ -232,6 +232,7 @@ Full results in `docs/eval_results.md`.
 - Ran black (15 files reformatted) — purely cosmetic; all 20 tests passed after
 - Ran ruff: removed 2 unused imports (leftover `retrieve` in app.py, unused
   `pytest` in a test) and 1 stray f-string with no placeholders
+- Pinned black/ruff config in `pyproject.toml` (line length, target py312)
 - All 20 tests green post-cleanup — confirms the formatting/lint changes were
   behavior-neutral
 
@@ -248,6 +249,62 @@ Full results in `docs/eval_results.md`.
   copies (in a repo, an editor buffer, or an AI assistant's context) are
   how regressions happen
 
+## Week 9 — Deployment to Streamlit Community Cloud
+
+### Pre-Deployment Audit
+- **Dependencies**: replaced the `pip freeze`-generated `requirements.txt`
+  (~130 packages) with 6 direct dependencies. Removed dev tools
+  (black/ruff/pytest) and the unused FastAPI stack (fastapi/uvicorn/starlette);
+  left transitive deps (torch, numpy, tokenizers, etc.) for pip to resolve.
+  Validated by installing into a fresh throwaway venv — all imports resolved.
+- **Secrets**: confirmed `.env` was never committed to any branch
+  (`git log --all -- .env` returned nothing) and is properly gitignored.
+  The API key moves to Streamlit Cloud's secrets manager instead.
+- **Memory**: the free tier caps at ~1 GB, and torch is the heavy hitter.
+  Two levers applied: reranking stays off by default (the cross-encoder never
+  loads on a fresh session), and CPU-only torch is pinned via
+  `--extra-index-url https://download.pytorch.org/whl/cpu` (no GPU on the
+  cloud, so the CUDA build would waste hundreds of MB). Fallback plan if it
+  didn't fit: Hugging Face Spaces (more RAM, built for ML apps) or swapping to
+  API-based embeddings so nothing heavy loads locally.
+
+### Deployment
+- Deployed to Streamlit Community Cloud from GitHub (main branch, `app.py`).
+- API key set in Streamlit secrets as TOML: `ANTHROPIC_API_KEY = "..."`.
+  pydantic-settings reads it from the environment with **zero code change** —
+  the Week 8 config decision paid off exactly as intended.
+- Build log confirmed the CPU-torch pin took effect (torch pulled from
+  `download.pytorch.org/whl/cpu`) — the memory optimization we couldn't verify
+  locally, verified on the actual Linux build.
+- App booted cleanly and the free-tier memory **held** through the first
+  question's model load (~80 MB embedding model download). The memory concern
+  flagged in the Red Team audit did not materialize on this deploy.
+- Verified end-to-end on the live URL: uploaded the AI Action Plan, asked
+  "What are the three pillars?", got a correct, cited answer.
+- Live URL: _(add your Streamlit app URL here)_
+
+### Observation
+- The three-pillars answer cited all three pillars as Page 3 — the Table of
+  Contents, where the pillar titles are listed together and therefore the
+  densest single source for that question. A correct citation, though it's the
+  TOC rather than where each pillar's content begins (pages 6, 17, 23). A nice
+  illustration of retrieval finding the highest-density match.
+
+### Key Learnings
+- `pip freeze` is not a deployment requirements file. It captures the whole
+  environment; a deploy file should list only direct dependencies and let pip
+  resolve the rest. Slimming it also reduces build time and memory pressure.
+- Know the platform: CPU-only torch is the single biggest memory lever for an
+  ML app on a GPU-less host. Shipping the CUDA build wastes hundreds of MB.
+- The config groundwork pays off at deploy: because pydantic-settings reads
+  environment variables, moving from a local `.env` to cloud secrets required
+  no code change at all.
+- Git hygiene (learned the hard way this session): edit files locally and let
+  `git push` be the *only* path to GitHub — editing in the GitHub web UI
+  creates a divergent commit and a merge conflict. And after saving a file
+  handed to you, verify it's actually on disk (`grep` a known phrase) before
+  committing, rather than assuming the save happened.
+
 ---
 
 ## Current Project Structure
@@ -256,7 +313,8 @@ Full results in `docs/eval_results.md`.
 rag-document-qa/
 ├── app.py                    # Streamlit frontend
 ├── README.md
-├── requirements.txt
+├── requirements.txt          # 6 direct deps + CPU-torch index (Week 9)
+├── pyproject.toml            # black + ruff config (Week 8)
 ├── .env.example
 ├── .gitignore
 ├── docs/
@@ -291,12 +349,17 @@ rag-document-qa/
 
 ## Known Issues / Tech Debt
 
-- **Streamlit Cloud memory risk (Week 9)**: sentence-transformers model
-  download and local inference may exceed the free tier's memory limits —
-  flagged in the post-Week 6 Red Team audit; verify during deployment.
+- **Streamlit Cloud memory (Week 9)**: sentence-transformers + torch load close
+  to the free tier's ~1 GB ceiling. It held on the first deploy (verified live),
+  but remains a watch item under heavier load or concurrent users. Mitigations
+  in place: reranking off by default, CPU-only torch. Fallback if it degrades:
+  Hugging Face Spaces or API-based embeddings.
 - **Global `top_k` budget**: retrieval doesn't allocate slots per document;
   coverage of any single document degrades as more documents are loaded.
   Stretch goal: per-document budgeting.
+- **Retrieval picks up page furniture**: near-empty pages (blank pages, header
+  lines) and the Table of Contents sometimes surface as sources. Candidate fix:
+  drop chunks below a minimum character length at ingest time.
 - **Noisy third-party logging**: httpx and sentence-transformers emit many
   INFO-level lines during model loading. Handled locally in `evaluate_qa.py`
   (those loggers set to WARNING). Still to do: apply the same centrally in
