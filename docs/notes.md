@@ -67,36 +67,6 @@ Added comprehensive error handling across the full pipeline:
   so errors appear as chat messages instead of stack traces, conditional
   sources expander (hidden when no sources)
 
-## Week 7 — Multi-Document Support & Conversation Memory
-
-### Multi-Document Support
-- Changed chunk IDs from `chunk_0` to `{source}_chunk_0` to prevent 
-  collisions across documents
-- Added `delete_document()` to vector_store.py — removes all chunks 
-  for a specific file using ChromaDB's `where` filter on source metadata
-- Updated app.py from single-file tracking (`processed_file`) to a list 
-  of dicts (`processed_files`) with name and chunk count per document
-- Duplicate upload detection prevents processing the same file twice
-- Sidebar shows all uploaded documents with individual remove buttons
-- "Clear All Documents" replaces the old "Clear & Upload New"
-
-### Conversation Memory
-- Added `conversation_history` parameter to `ask()` in qa_chain.py
-- Passes last 3 Q&A exchanges (6 messages) to Claude for follow-up context
-- app.py sends `st.session_state["messages"][:-1]` to avoid duplicate 
-  user messages (current question is already appended before the call)
-- Follow-ups like "which agencies handle those actions?" now work because 
-  Claude has prior context
-
-### Key Learning
-- Conversation memory helps the LLM understand follow-ups, but the 
-  retriever still operates on the raw query. Vague follow-ups like 
-  "tell me more about that" retrieve poorly because they lack semantic 
-  content for vector search. Query rewriting would fix this but is a 
-  stretch goal.
-- RAG retrieval is semantic, not structural — asking for "page 3" doesn't 
-  work because vector search matches on meaning, not page numbers.
-  
 Tested scenarios: corrupt PDF, missing API key, normal happy path — all passed.
 
 ### Structured Logging
@@ -153,24 +123,122 @@ Created 20 pytest tests across 3 files, all passing:
 - **test_qa_chain.py** (4 tests): build_context formatting — single result,
   multiple results, empty results, divider separation
 
----
+## Red Team Audit (post-Week 6)
+
+Ran an adversarial review of the project before starting Week 7.
+
+**Fixed:**
+- Updated model string from `claude-sonnet-4-20250514` to
+  `claude-sonnet-4-5-20250929` — the old model was approaching retirement
+  (May 2026); the new one is supported through at least September 2026.
+  For a portfolio app that stays live for months, model longevity matters.
+- Added a question length limit (1000 chars, now `max_question_length` in
+  config) to prevent API cost abuse from oversized prompts
+
+**Checked, confirmed OK:**
+- requirements.txt current; ChromaDB on 1.5.0 (current 1.x line, pinned)
+
+**Noted for awareness (no fix needed now):**
+- Temp file orphans possible if Streamlit crashes mid-processing (minor)
+- API client created at import time with a potentially null key — mitigated
+  by the early key check in `ask()`
+- evaluate_retrieval.py hardcodes the PDF path (fine for a one-time script)
+- **Deployment concern for Week 9:** sentence-transformers model download
+  (~80MB) plus local inference could hit memory limits on Streamlit Cloud's
+  free tier
+
+## Week 7 — Multi-Document Support & Conversation Memory
+
+### Multi-Document Support
+- Changed chunk IDs from `chunk_0` to `{source}_chunk_0` to prevent
+  collisions across documents
+- Added `delete_document()` to vector_store.py — removes all chunks
+  for a specific file using ChromaDB's `where` filter on source metadata
+- Updated app.py from single-file tracking (`processed_file`) to a list
+  of dicts (`processed_files`) with name and chunk count per document
+- Duplicate upload detection prevents processing the same file twice
+- Sidebar shows all uploaded documents with individual remove buttons
+- "Clear All Documents" replaces the old "Clear & Upload New"
+
+### Conversation Memory
+- Added `conversation_history` parameter to `ask()` in qa_chain.py
+- Passes last 3 Q&A exchanges (6 messages) to Claude for follow-up context
+- app.py sends `st.session_state["messages"][:-1]` to avoid duplicate
+  user messages (current question is already appended before the call)
+- Follow-ups like "which agencies handle those actions?" now work because
+  Claude has prior context
+
+### Key Learning
+- Conversation memory helps the LLM understand follow-ups, but the
+  retriever still operates on the raw query. Vague follow-ups like
+  "tell me more about that" retrieve poorly because they lack semantic
+  content for vector search. Query rewriting would fix this but is a
+  stretch goal.
+- RAG retrieval is semantic, not structural — asking for "page 3" doesn't
+  work because vector search matches on meaning, not page numbers.
 
 ## Week 8 — Configuration & Evaluation
 
-**Configuration:** Centralized every tunable value + the API key into
-`src/config.py` using pydantic-settings. All six src modules read from one
-validated `settings` object; env-overridable for deployment. Set
-temperature=0.0 explicitly (was silently at the API default). Caught a
-chunk_size drift bug (chunker defaulted to 1000 while retriever passed 1500).
-A wholesale rewrite of vector_store.py from a stale copy silently reverted two
-Week 7 changes (source-scoped chunk IDs + delete_document) — both restored;
-lesson logged about targeted edits over rewrites.
+### Configuration Management (`src/config.py`)
+- Centralized every tunable value plus the API key into a single validated
+  `Settings` object using pydantic-settings
+- Chose pydantic-settings over a plain dataclass/constants module: env-var
+  and `.env` overrides are built in, which means zero rework when deploying
+  in Week 9 (Streamlit Cloud secrets become one-line overrides)
+- All six src modules now read from `from src.config import settings`
+- Settings groups: secrets, chunking, retrieval, models, LLM call,
+  conversation memory, vector store, UI — every option documented inline
+- Modules keep optional parameters that default to `None` and resolve to
+  config values inside the function — callers can still override per-call
+  (backwards-compatible pattern from Week 6, applied project-wide)
+- Set `temperature=0.0` explicitly (was silently riding the API default) —
+  deterministic output is correct for grounded Q&A
+- Extracted the chunker's hardcoded 0.5 break-point ratio into
+  `chunk_break_threshold`
 
-**Evaluation:** Built `scripts/evaluate_qa.py` — end-to-end QA eval (distinct
-from retrieval eval) scoring citation accuracy (±1 page tolerance), keyword
-coverage, and refusal, with manual correctness. Results: citation 9/10,
-keywords 17/20, refusals 2/2, correctness 12/12. One documented miss (Q7,
-structural query). Results in docs/eval_results.md.
+### Bugs Caught During the Refactor
+- **chunk_size drift**: chunker defaulted to 1000 while retriever passed
+  1500 — modules disagreed about the default. Centralizing config surfaced
+  and fixed it. This is the quiet payoff of single-source-of-truth settings.
+- **Stale-rewrite regression**: a wholesale rewrite of vector_store.py from
+  an outdated copy silently reverted two Week 7 changes (source-scoped chunk
+  IDs and `delete_document`). Both surfaced at app launch and were restored.
+  Lesson: make targeted edits to the current file; never rewrite a module
+  from a snapshot without diffing against the working version first.
+
+### End-to-End QA Evaluation (`scripts/evaluate_qa.py`)
+Distinct from Week 6's retrieval eval — this one scores the *answers*,
+not just the retrieved chunks:
+
+- 12-question test set against the America's AI Action Plan PDF
+- Automated metrics: citation accuracy (cited page within ±1 of expected),
+  keyword coverage (expected terms present in the answer), refusal check
+  (out-of-scope questions correctly declined)
+- Manual metric: answer correctness, scored by reading each answer
+
+**Results:** citation accuracy 9/10, keyword coverage 17/20, refusals 2/2,
+manual correctness 12/12. One documented miss (Q7, a structural query —
+consistent with the known "semantic, not structural" retrieval limitation).
+Full results in `docs/eval_results.md`.
+
+### Known Limitation Documented
+- `top_k` is a global budget across all loaded documents. With one document,
+  the top 5 chunks all come from it; with five documents, those same 5 slots
+  are shared, so per-document coverage degrades as the library grows.
+  Per-document `top_k` budgeting deferred as a stretch goal.
+
+### Key Learnings
+- Configuration centralization pays forward: the pydantic-settings choice
+  means Week 9 deployment config is mostly "set environment variables"
+- Refactoring is a bug-finding activity, not just cleanup — the chunk_size
+  drift only became visible when everything read from one place
+- Two kinds of evaluation, two kinds of confidence: retrieval eval answers
+  "are the right chunks coming back?"; end-to-end QA eval answers "is the
+  user getting a correct, cited answer?" A system can pass one and fail
+  the other.
+- Project knowledge hygiene matters as much as code hygiene: stale file
+  copies (in a repo, an editor buffer, or an AI assistant's context) are
+  how regressions happen
 
 ---
 
@@ -184,9 +252,11 @@ rag-document-qa/
 ├── .env.example
 ├── .gitignore
 ├── docs/
-│   └── notes.md              # This file
+│   ├── notes.md              # This file
+│   └── eval_results.md       # End-to-end QA eval results (Week 8)
 ├── src/
 │   ├── __init__.py
+│   ├── config.py             # Central pydantic-settings config (Week 8)
 │   ├── logging_config.py     # Centralized logging setup (Week 6)
 │   ├── document_loader.py    # PDF text extraction with PyMuPDF
 │   ├── chunker.py            # Text chunking with configurable size/overlap
@@ -196,7 +266,8 @@ rag-document-qa/
 │   ├── reranker.py           # Cross-encoder reranking (Week 6)
 │   └── qa_chain.py           # Claude integration for answer generation
 ├── scripts/
-│   └── evaluate_retrieval.py # Retrieval quality evaluation (Week 6)
+│   ├── evaluate_retrieval.py # Retrieval quality evaluation (Week 6)
+│   └── evaluate_qa.py        # End-to-end QA evaluation (Week 8)
 ├── tests/
 │   ├── __init__.py
 │   ├── test_chunker.py       # 8 tests (Week 6)
@@ -207,3 +278,22 @@ rag-document-qa/
 │   └── chroma_db/            # Vector database storage (gitignored)
 └── notebooks/
 ```
+
+---
+
+## Known Issues / Tech Debt
+
+- **Streamlit Cloud memory risk (Week 9)**: sentence-transformers model
+  download and local inference may exceed the free tier's memory limits —
+  flagged in the post-Week 6 Red Team audit; verify during deployment.
+- **Global `top_k` budget**: retrieval doesn't allocate slots per document;
+  coverage of any single document degrades as more documents are loaded.
+  Stretch goal: per-document budgeting.
+- **Noisy third-party logging**: httpx and sentence-transformers emit many
+  INFO-level lines during model loading. Fix: set their loggers to WARNING
+  in logging_config.py.
+- **Eval script re-ingestion**: evaluate_retrieval.py re-ingests the full
+  document for each configuration (6×). Could re-embed only when chunk size
+  changes, but not worth optimizing a one-time script.
+- **Streamlit file watcher reload loop on Windows**: workaround is
+  `--server.fileWatcherType none` or the `.streamlit/config.toml` fix.
