@@ -99,8 +99,9 @@ Created `scripts/evaluate_retrieval.py` with:
 
 Key insight: the "three pillars" question that previously found only 2/3 pillars
 now finds all 3 with the larger chunk size. The third pillar (International
-Diplomacy and Security, page 20) was getting missed with 1000-size chunks
-because it wasn't landing in the top 5 retrieved results.
+Diplomacy and Security — PDF page 23; printed page 20, with the +3 offset coming
+from the cover/epigraph/table-of-contents front matter) was getting missed with
+1000-size chunks because it wasn't landing in the top 5 retrieved results.
 
 ### Reranking Module
 - Built `src/reranker.py` using cross-encoder model (`cross-encoder/ms-marco-MiniLM-L-6-v2`)
@@ -227,6 +228,13 @@ Full results in `docs/eval_results.md`.
   are shared, so per-document coverage degrades as the library grows.
   Per-document `top_k` budgeting deferred as a stretch goal.
 
+### Code Cleanup
+- Ran black (15 files reformatted) — purely cosmetic; all 20 tests passed after
+- Ran ruff: removed 2 unused imports (leftover `retrieve` in app.py, unused
+  `pytest` in a test) and 1 stray f-string with no placeholders
+- All 20 tests green post-cleanup — confirms the formatting/lint changes were
+  behavior-neutral
+
 ### Key Learnings
 - Configuration centralization pays forward: the pydantic-settings choice
   means Week 9 deployment config is mostly "set environment variables"
@@ -290,8 +298,9 @@ rag-document-qa/
   coverage of any single document degrades as more documents are loaded.
   Stretch goal: per-document budgeting.
 - **Noisy third-party logging**: httpx and sentence-transformers emit many
-  INFO-level lines during model loading. Fix: set their loggers to WARNING
-  in logging_config.py.
+  INFO-level lines during model loading. Handled locally in `evaluate_qa.py`
+  (those loggers set to WARNING). Still to do: apply the same centrally in
+  `logging_config.py` so it covers the app too.
 - **Eval script re-ingestion**: evaluate_retrieval.py re-ingests the full
   document for each configuration (6×). Could re-embed only when chunk size
   changes, but not worth optimizing a one-time script.
